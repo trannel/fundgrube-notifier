@@ -60,7 +60,7 @@ def create_new_items() -> pd.DataFrame:
         body = soup.body
 
         for product in products:
-            terms = [x.lower() for x in product["terms"]]
+            terms = [x.lower() for x in product.get("terms")]
             tags = body.find_all('a', text=lambda text: text and all([term in text.lower() for term in terms]))
             stores = [tag.find_parent("div").previous_sibling.contents[0].text.strip() for tag in tags]
             images = [tag.get("href") for tag in tags]
@@ -69,9 +69,15 @@ def create_new_items() -> pd.DataFrame:
             df_tmp = pd.DataFrame({"name": names, "price": prices, "store": stores, "image": images})
             if df_tmp.size > 0:
                 if "price" in product:
-                    df_tmp = df_tmp[pd.to_numeric(df_tmp["price"].str.slice(stop=-4)) <= product.get("price")]
-                df_tmp["store"] = retailer["name"] + " - " + df_tmp["store"]
+                    df_tmp = df_tmp[
+                        pd.to_numeric(df_tmp["price"].str.slice(stop=-1).str.replace(",", "")) <= product.get(
+                            "price") * 100]
+                if "terms_not" in product:
+                    terms_not = [x.lower() for x in product.get("terms_not")]
+                    df_tmp = df_tmp[~df_tmp["name"].str.contains("|".join(terms_not), case=False, regex=True)]
+                df_tmp["store"] = retailer.get("name") + " - " + df_tmp["store"]
                 df = pd.concat([df, df_tmp])
+            df = df.drop_duplicates()
     return df
 
 
@@ -87,6 +93,7 @@ def load_old_items(filename: str) -> pd.DataFrame:
 
 def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame):
     df = pd.merge(left=df_new, right=df_old, how="left", on=["name", "price", "store", "image"])
+    df = df.drop_duplicates()
     new_count = df["time"].isna().sum()
 
     df["time"] = df["time"].fillna(datetime.now())
@@ -99,8 +106,8 @@ def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame):
         pd.set_option('display.max_colwidth', None)
         log.info(df[0:new_count])
 
-        log.debug("Save results")
-        df.to_csv(filename, encoding="utf-8", index=False)
+    log.debug("Save results")
+    df.to_csv(filename, encoding="utf-8", index=False)
 
 
 if __name__ == '__main__':
