@@ -1,13 +1,18 @@
 import json
 import logging as log
-import os.path
+import os
+import smtplib
 from datetime import datetime
+from email.mime.text import MIMEText
+from typing import Tuple
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter, Retry
 
+load_dotenv()
 log.basicConfig(level=log.DEBUG)
 
 retailers = [
@@ -33,8 +38,8 @@ def request(retailer: retailers) -> str:
     prod = os.environ.get("ENV") == 'prod'
 
     if not prod and os.path.isfile(filename_html):
-        timestamp = os.path.getmtime(filename_html)
-        time_diff = datetime.now().timestamp() - timestamp
+        last_update = os.path.getmtime(filename_html)
+        time_diff = datetime.now().timestamp() - last_update
         if time_diff < 50 * 60:
             with open(filename_html, "r", encoding="utf-8") as file:
                 log.debug("Loaded items from file")
@@ -46,6 +51,7 @@ def request(retailer: retailers) -> str:
     return html.decode("utf-8")
 
 
+# TODO check last request on websites
 def create_new_items() -> pd.DataFrame:
     with open("products.json", "r", encoding="utf-8") as search_file:
         products = json.load(search_file)
@@ -91,14 +97,14 @@ def load_old_items(filename: str) -> pd.DataFrame:
         return pd.DataFrame({"name": [], "price": [], "store": [], "image": [], "time": []})
 
 
-def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame):
+def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame) -> Tuple[int, pd.DataFrame]:
     df = pd.merge(left=df_new, right=df_old, how="left", on=["name", "price", "store", "image"])
     df = df.drop_duplicates()
     new_count = df["time"].isna().sum()
 
     df["time"] = df["time"].fillna(datetime.now())
     df = df.sort_values(by=["time", "store", "name"], ascending=False)
-    log.info(f"There were {new_count} new results")  # TODO better notifications
+    log.info(f"There were {new_count} new results")
     if new_count > 0:
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
@@ -108,6 +114,32 @@ def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame):
 
     log.debug("Save results")
     df.to_csv(filename, encoding="utf-8", index=False)
+    return new_count, df
+
+
+def notify(new_count: int, df_merge: pd.DataFrame) -> None:
+    mail = os.getenv("MAIL")
+    mail_pwd = os.getenv("MAIL_PWD")
+    if mail and mail_pwd and new_count > 0:
+        sender = 'Fundgrube Notifier'
+        receiver = mail
+        df_new_items = df_merge.iloc[:new_count].drop(columns="time")
+
+        message_text = "\n".join(["  ".join(list(row[1])) for row in df_new_items.iterrows()])
+        # row_generator = zip(*df_new_items.to_dict("list").values())
+        # message_text = "\n".join(["  ".join(list(row)) for row in row_generator])
+        log.debug("Mail message", message_text)
+        message = MIMEText(message_text, "plain", "utf-8")
+
+        message['Subject'] = f"Fundgrube: {new_count} new items"
+        message['From'] = sender
+        message['To'] = receiver
+
+        smtp_client = smtplib.SMTP('smtp.gmail.com', 587)
+        smtp_client.starttls()
+        smtp_client.login(mail, mail_pwd)
+        smtp_client.sendmail(sender, [receiver], message.as_string())
+        smtp_client.quit()
 
 
 if __name__ == '__main__':
@@ -116,4 +148,7 @@ if __name__ == '__main__':
 
     df_new = create_new_items()
     df_old = load_old_items(filename)
-    process_dfs(df_new, df_old)
+    new_count, df_merge = process_dfs(df_new, df_old)
+    notify(new_count, df_merge)
+    # TODO update README
+    # TODO add tests
