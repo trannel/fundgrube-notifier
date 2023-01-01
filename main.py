@@ -2,7 +2,7 @@ import json
 import logging as log
 import os
 import smtplib
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from typing import Tuple
 
@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter, Retry
 
 load_dotenv()
-log.basicConfig(level=log.DEBUG)
+log.basicConfig(level=log.DEBUG, format='%(asctime)s.%(msecs)04d %(levelname)s: %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S')
 
 retailers = [
     {
@@ -35,9 +36,9 @@ s.mount('https://', adapter)
 def request(retailer: retailers) -> str:
     filename_html = f"{retailer['name']}.html"
 
-    prod = os.environ.get("ENV") == 'prod'
+    dev = os.environ.get("ENV") == 'dev'
 
-    if not prod and os.path.isfile(filename_html):
+    if dev and os.path.isfile(filename_html):
         last_update = os.path.getmtime(filename_html)
         time_diff = datetime.now().timestamp() - last_update
         if time_diff < 50 * 60:
@@ -45,13 +46,12 @@ def request(retailer: retailers) -> str:
                 log.debug("Loaded items from file")
                 return file.read()
     html = requests.get(retailer["url"]).content
-    if not prod:
+    if dev:
         with open(filename_html, "wb") as file:
             file.write(html)
     return html.decode("utf-8")
 
 
-# TODO check last request on websites
 def create_new_items() -> pd.DataFrame:
     with open("products.json", "r", encoding="utf-8") as search_file:
         products = json.load(search_file)
@@ -65,9 +65,19 @@ def create_new_items() -> pd.DataFrame:
         log.debug("Parse soup")
         body = soup.body
 
+        # check for last update
+        last_update_str = body.select_one('div:first-child').text
+        last_update = datetime.strptime(last_update_str, '\n\nLetzter Abruf: %d.%m.%Y, %H:%M Uhr')
+        log.debug(f"Last update: {last_update}")
+
+        if datetime.now() - last_update > timedelta(hours=2, minutes=30):
+            message = f"No updated data available. Last update: {last_update}. Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+            log.error(message)
+            raise ValueError(message)
+
         for product in products:
-            terms = [x.lower() for x in product.get("terms")]
-            tags = body.find_all('a', text=lambda text: text and all([term in text.lower() for term in terms]))
+            terms_include = [x.lower() for x in product.get("include")]
+            tags = body.find_all('a', text=lambda text: text and all([term in text.lower() for term in terms_include]))
             stores = [tag.find_parent("div").previous_sibling.contents[0].text.strip() for tag in tags]
             images = [tag.get("href") for tag in tags]
             names = [tag.text for tag in tags]
@@ -78,9 +88,9 @@ def create_new_items() -> pd.DataFrame:
                     df_tmp = df_tmp[
                         pd.to_numeric(df_tmp["price"].str.slice(stop=-1).str.replace(",", "")) <= product.get(
                             "price") * 100]
-                if "terms_not" in product:
-                    terms_not = [x.lower() for x in product.get("terms_not")]
-                    df_tmp = df_tmp[~df_tmp["name"].str.contains("|".join(terms_not), case=False, regex=True)]
+                if "exclude" in product:
+                    terms_exclude = [x.lower() for x in product.get("exclude")]
+                    df_tmp = df_tmp[~df_tmp["name"].str.contains("|".join(terms_exclude), case=False, regex=True)]
                 df_tmp["store"] = retailer.get("name") + " - " + df_tmp["store"]
                 df = pd.concat([df, df_tmp])
             df = df.drop_duplicates()
@@ -117,27 +127,35 @@ def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame) -> Tuple[int, pd.Dat
     return new_count, df
 
 
-def notify(new_count: int, df_merge: pd.DataFrame) -> None:
-    mail = os.getenv("MAIL")
+def notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None) -> None:
+    mail_sender = os.getenv("MAIL_SENDER")
     mail_pwd = os.getenv("MAIL_PWD")
-    if mail and mail_pwd and new_count > 0:
+    if (mail_sender and mail_pwd and new_count > 0) or error:
+        smtp_server = os.getenv("MAIL_SERVER", 'smtp.gmail.com')
+        smtp_port = os.getenv("MAIL_PORT", 587)
         sender = 'Fundgrube Notifier'
-        receiver = mail
-        df_new_items = df_merge.iloc[:new_count].drop(columns="time")
+        receiver = os.getenv("MAIL_RECEIVER", mail_sender)
 
-        message_text = "\n".join(["  ".join(list(row[1])) for row in df_new_items.iterrows()])
-        # row_generator = zip(*df_new_items.to_dict("list").values())
-        # message_text = "\n".join(["  ".join(list(row)) for row in row_generator])
-        log.debug("Mail message", message_text)
+        if error:
+            message_text = str(error)
+        else:
+            df_new_items = df_merge.iloc[:new_count].drop(columns="time")
+            message_text = "\n".join(["  ".join(list(row[1])) for row in df_new_items.iterrows()])
+            # row_generator = zip(*df_new_items.to_dict("list").values())
+            # message_text = "\n".join(["  ".join(list(row)) for row in row_generator])
+        log.debug(f"Mail message:\n{message_text}")
         message = MIMEText(message_text, "plain", "utf-8")
 
-        message['Subject'] = f"Fundgrube: {new_count} new items"
+        if error:
+            message['Subject'] = f"Fundgrube: An error occured"
+        else:
+            message['Subject'] = f"Fundgrube: {new_count} new items"
         message['From'] = sender
         message['To'] = receiver
 
-        smtp_client = smtplib.SMTP('smtp.gmail.com', 587)
+        smtp_client = smtplib.SMTP(smtp_server, smtp_port)
         smtp_client.starttls()
-        smtp_client.login(mail, mail_pwd)
+        smtp_client.login(mail_sender, mail_pwd)
         smtp_client.sendmail(sender, [receiver], message.as_string())
         smtp_client.quit()
 
@@ -146,9 +164,11 @@ if __name__ == '__main__':
     log.debug("Start script")
     filename = "results.csv"
 
-    df_new = create_new_items()
-    df_old = load_old_items(filename)
-    new_count, df_merge = process_dfs(df_new, df_old)
-    notify(new_count, df_merge)
-    # TODO update README
-    # TODO add tests
+    try:
+        df_new = create_new_items()
+        df_old = load_old_items(filename)
+        new_count, df_merge = process_dfs(df_new, df_old)
+    except Exception as e:
+        notify(0, pd.DataFrame({}), e)
+    else:
+        notify(new_count, df_merge)

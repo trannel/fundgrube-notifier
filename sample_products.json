@@ -1,0 +1,10 @@
+[
+  {
+    "include": ["sony", "tv"],
+    "exclude": ["lcd"]
+  },
+  {
+    "include": ["playstation"],
+    "price": 20
+  }
+]

@@ -3,32 +3,69 @@
 This project notifies you about current offers from the German electronics retail chains Saturn and Media Markt in their
 Fundgrube, that match specific conditions you can define.
 
+## Setup
+
+Before you start make sure python 3 is installed on your machine.
+First, clone the project and install the required packages with
+```sh
+pip install -r requirements.txt
+```
+
+Next, rename the file `sample_products.json` in the root directory of the project to `products.json` and fill it as specified in the [Options](#options) section.
+
+If you want to get email notifications, the easiest way is to use a [Google account](https://www.google.com/account/about/) (for Gmail)
+with [2FA](https://support.google.com/accounts/answer/185839) enabled.
+In your account you have to generate an [app password](https://support.google.com/accounts/answer/185833) for Gmail.
+While creating the password select "Mail" as app and "Other" as device (select as custom name you see fit, e.g., " Raspberry Pi").
+We need to use app passwords (which in turn require 2FA) due to a [policy change](https://support.google.com/accounts/answer/6010255) in mid-2022.
+Lastly, you have to rename the `sample.env` to `.env` and fill it as follows:
+- `MAIL_SENDER` The gmail address you want to send the emails from.
+- `MAIL_PWD` The 16-digit app password you generated.
+- `MAIL_RECEIVER` If you want to receive the emails on another address, set it here. (Optional)
+
+If you do not want to use Gmail you also have to specify:
+- `MAIL_SERVER` The SMTP server of your email provider.
+- `MAIL_PORT` The SMTP port.
+
+Be aware though, that non-Gmail approaches might run into issues with 2FA etc.
+
 ## Usage
 
-First, install the project and the required packages from the `requirements.txt`.
-Next, create a file called `products.json` in the root directory of the project, and once it is filled, run
-the `main.py`.
-Entries in the file are created in JSON format and every JSON object can have the following attributes:
+Once everything is set up, you can run the `main.py` with
+```sh
+python main.py
+```
 
-- terms: A list of terms that must be included in the name of the article (case-insensitive). Mandatory attribute.
-- price: You will not get a notification, if this price is surpassed. Optional attribute.
+You can also set up a cron job (or something similar) to automatically execute the script every hour.
 
-Example:
+### Options
+
+Entries in the `products.json` file are created in JSON format and every JSON object can have the following attributes
+to filter the
+available articles:
+- **include**: A list of terms that must appear in the name of the article (case-insensitive). Mandatory attribute.
+- **price**: Articles with a higher price are ignored. Optional attribute.
+- **exclude**: A list of terms, that must *not* appear in the name of the article (case-insensitive). Optional
+  attribute.
+
+When choosing the terms for `include` and `exclude`, remember that we only do simple string matching, so sometimes only using substrings might be beneficial.
+
+### Example
+
+See [sample_products.json](sample_products.json):
 
 ```json
 [
   {
-    "terms": ["sony", "tv"]
+    "include": ["sony", "tv"],
+    "exclude": ["lcd"]
   },
   {
-    "terms": ["playstation"],
+    "include": ["playstation"],
     "price": 20
   }
 ]
 ```
-
-You will get notification for every article with the terms "sony" and "tv" in the name regardless of its price and every
-product with "playstation" that is 20€ or less.
 
 ## Fundgrube
 
