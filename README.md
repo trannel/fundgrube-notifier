@@ -52,20 +52,7 @@ When choosing the terms for `include` and `exclude`, remember that we only do si
 
 ### Example
 
-See [sample_products.json](sample_products.json):
-
-```json
-[
-  {
-    "include": ["sony", "tv"],
-    "exclude": ["lcd"]
-  },
-  {
-    "include": ["playstation"],
-    "price": 20
-  }
-]
-```
+https://github.com/trannel/fundgrube_notifier/blob/14e2a8eee97d0efdf3dd9cb79cb869f48606f61a/sample_products.json#L1-L10
 
 ## Fundgrube
 
