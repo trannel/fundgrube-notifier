@@ -1,17 +1,18 @@
-# Fundgrube notifier
+# Fundgrube Notifier
 
 This project notifies you about current offers from the German electronics retail chains Saturn and Media Markt in their
 Fundgrube, that match specific conditions you can define.
 
 ## Setup
 
-Before you start make sure python 3 is installed on your machine.
-First, clone the project and install the required packages with
+Before you start make sure [python 3.9](https://www.python.org/downloads/) (or higher) and [poetry](https://python-poetry.org/docs/) are installed on your machine.
+
+First, clone the project, navigate to its root directory, and install the dependencies with
 ```sh
-pip install -r requirements.txt
+poetry install
 ```
 
-Next, rename the file `sample_products.json` in the root directory of the project to `products.json` and fill it as specified in the [Options](#options) section.
+Next, rename the file `sample_products.json` in the `data` directory to `products.json` and fill it as specified in the [Options](#options) section.
 
 If you want to get email notifications, the easiest way is to use a [Google account](https://www.google.com/account/about/) (for Gmail)
 with [2FA](https://support.google.com/accounts/answer/185839) enabled.
@@ -20,50 +21,46 @@ While creating the password select "Mail" as app and "Other" as device (select a
 We need to use app passwords (which in turn require 2FA) due to a [policy change](https://support.google.com/accounts/answer/6010255) in mid-2022.
 Lastly, you have to rename the `sample.env` to `.env` and fill it as follows:
 - `MAIL_SENDER` The gmail address you want to send the emails from.
-- `MAIL_PWD` The 16-digit app password you generated.
+- `MAIL_PASSWORD` The 16-digit app password you generated.
 - `MAIL_RECEIVER` If you want to receive the emails on another address, set it here. (Optional)
 
 If you do not want to use Gmail you also have to specify:
-- `MAIL_SERVER` The SMTP server of your email provider.
-- `MAIL_PORT` The SMTP port.
+- `SMTP_SERVER` The SMTP server of your email provider.
+- `SMTP_PORT` The corresponding SMTP port.
 
 Be aware though, that non-Gmail approaches might run into issues with 2FA etc.
 
 ## Usage
 
-Once everything is set up, you can run the `main.py` with
+Once everything is set up, you can run the script with
 ```sh
-python main.py
+poetry run python fundgrube_notifier.py
 ```
 
 You can also set up a cron job (or something similar) to automatically execute the script every hour.
 
 ### Options
 
-Entries in the `products.json` file are created in JSON format and every JSON object can have the following attributes
-to filter the
-available articles:
+Entries in the `products.json` file are created in JSON format and every JSON object can have the following attributes to filter the available articles:
 - **include**: A list of terms that must appear in the name of the article (case-insensitive). Mandatory attribute.
 - **price**: Articles with a higher price are ignored. Optional attribute.
-- **exclude**: A list of terms, that must *not* appear in the name of the article (case-insensitive). Optional
-  attribute.
+- **exclude**: A list of terms, that must *not* appear in the name of the article (case-insensitive). Optional attribute.
 
-When choosing the terms for `include` and `exclude`, remember that we only do simple string matching, so sometimes only using substrings might be beneficial.
+When choosing the terms for `include` and `exclude`, remember that only simple string matching is done, so sometimes only using substrings might be beneficial.
 
 ### Example
 
-https://github.com/trannel/fundgrube_notifier/blob/14e2a8eee97d0efdf3dd9cb79cb869f48606f61a/sample_products.json#L1-L10
+https://github.com/trannel/fundgrube-notifier/blob/14e2a8eee97d0efdf3dd9cb79cb869f48606f61a/sample_products.json#L1-L10
 
 ## Fundgrube
 
-The Fundgrube has special offers that are usually very limited in numbers and can be found here
-
+The Fundgrube has special offers that are usually very limited in numbers and can be found here:
 - Saturn: https://www.saturn.de/de/data/fundgrube
 - Media Markt: https://www.mediamarkt.de/de/data/fundgrube
 
 ### Data
 
-The project is using already preprocessed data, which is crawled hourly by a script
+This project is using already preprocessed data, which is crawled hourly by a script
 from [Barney](https://www.mydealz.de/profile/Barney) at [mydealz](https://www.mydealz.de/):
 
 - Saturn: https://schneinet.de/saturn.html

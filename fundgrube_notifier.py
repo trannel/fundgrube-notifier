@@ -13,8 +13,13 @@ from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter, Retry
 
 load_dotenv()
-log.basicConfig(level=log.DEBUG, format='%(asctime)s.%(msecs)04d %(levelname)s: %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S')
+dev = os.getenv("ENV") == 'dev'
+if dev:
+    log.basicConfig(level=log.DEBUG, format='%(asctime)s.%(msecs)04d %(levelname)s: %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S', encoding="utf-8")
+else:
+    log.basicConfig(level=log.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+                    encoding="utf-8")
 
 retailers = [
     {
@@ -34,9 +39,7 @@ s.mount('https://', adapter)
 
 
 def request(retailer: retailers) -> str:
-    filename_html = f"{retailer['name']}.html"
-
-    dev = os.environ.get("ENV") == 'dev'
+    filename_html = f"data/{retailer['name']}.html"
 
     if dev and os.path.isfile(filename_html):
         last_update = os.path.getmtime(filename_html)
@@ -53,12 +56,12 @@ def request(retailer: retailers) -> str:
 
 
 def create_new_items() -> pd.DataFrame:
-    with open("products.json", "r", encoding="utf-8") as search_file:
+    with open("data/products.json", "r", encoding="utf-8") as search_file:
         products = json.load(search_file)
     df = pd.DataFrame({})
 
     for retailer in retailers:
-        log.debug(f"Request {retailer['name']} data")
+        log.info(f"Request {retailer['name']} data")
         html = request(retailer)
         log.debug("Create soup")
         soup = BeautifulSoup(html, 'html.parser')
@@ -116,11 +119,7 @@ def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame) -> Tuple[int, pd.Dat
     df = df.sort_values(by=["time", "store", "name"], ascending=False)
     log.info(f"There were {new_count} new results")
     if new_count > 0:
-        pd.set_option('display.max_rows', None)
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', None)
-        pd.set_option('display.max_colwidth', None)
-        log.info(df[0:new_count])
+        log.info("\n" + df[:new_count].drop(columns="time").to_string(index=False, header=False))
 
     log.debug("Save results")
     df.to_csv(filename, encoding="utf-8", index=False)
@@ -129,40 +128,40 @@ def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame) -> Tuple[int, pd.Dat
 
 def notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None) -> None:
     mail_sender = os.getenv("MAIL_SENDER")
-    mail_pwd = os.getenv("MAIL_PWD")
-    if (mail_sender and mail_pwd and new_count > 0) or error:
-        smtp_server = os.getenv("MAIL_SERVER", 'smtp.gmail.com')
-        smtp_port = os.getenv("MAIL_PORT", 587)
-        sender = 'Fundgrube Notifier'
+    mail_password = os.getenv("MAIL_PASSWORD")
+    if (mail_sender and mail_password and new_count > 0) or error:
+        smtp_server = os.getenv("SMTP_SERVER", 'smtp.gmail.com')
+        smtp_port = os.getenv("SMTP_PORT", 587)
+        sender = f'Fundgrube Notifier <{mail_sender}>'
         receiver = os.getenv("MAIL_RECEIVER", mail_sender)
 
         if error:
             message_text = str(error)
         else:
-            df_new_items = df_merge.iloc[:new_count].drop(columns="time")
+            df_new_items = df_merge[:new_count].drop(columns="time")
             message_text = "\n".join(["  ".join(list(row[1])) for row in df_new_items.iterrows()])
-            # row_generator = zip(*df_new_items.to_dict("list").values())
-            # message_text = "\n".join(["  ".join(list(row)) for row in row_generator])
         log.debug(f"Mail message:\n{message_text}")
         message = MIMEText(message_text, "plain", "utf-8")
 
         if error:
-            message['Subject'] = f"Fundgrube: An error occured"
+            message['Subject'] = f"An error occured"
         else:
-            message['Subject'] = f"Fundgrube: {new_count} new items"
+            message['Subject'] = f"{new_count} new items"
+        if mail_sender == receiver:
+            message['Subject'] = "Fundgrube: " + message['Subject']
         message['From'] = sender
         message['To'] = receiver
 
         smtp_client = smtplib.SMTP(smtp_server, smtp_port)
         smtp_client.starttls()
-        smtp_client.login(mail_sender, mail_pwd)
+        smtp_client.login(mail_sender, mail_password)
         smtp_client.sendmail(sender, [receiver], message.as_string())
         smtp_client.quit()
 
 
 if __name__ == '__main__':
     log.debug("Start script")
-    filename = "results.csv"
+    filename = "data/results.csv"
 
     try:
         df_new = create_new_items()
