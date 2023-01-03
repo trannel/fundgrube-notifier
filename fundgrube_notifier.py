@@ -144,11 +144,13 @@ def notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None) -> N
         message = MIMEText(message_text, "plain", "utf-8")
 
         if error:
-            message['Subject'] = f"An error occured"
+            subject = f"An error occured"
         else:
-            message['Subject'] = f"{new_count} new items"
+            subject = f"{new_count} new items"
         if mail_sender == receiver:
-            message['Subject'] = "Fundgrube: " + message['Subject']
+            message['Subject'] = "Fundgrube: " + subject
+        else:
+            message['Subject'] = subject
         message['From'] = sender
         message['To'] = receiver
 
