@@ -1,18 +1,19 @@
 # Fundgrube Notifier
 
-This project notifies you about current offers from the German electronics retail chains Saturn and Media Markt in their
-Fundgrube, that match specific conditions you can define.
+This project notifies you about current offers from the German electronics retail chains Saturn and Media Markt in their Fundgrube, that match specific conditions you can define.
 
 ## Setup
 
 Before you start make sure [python 3.9](https://www.python.org/downloads/) (or higher) and [poetry](https://python-poetry.org/docs/) are installed on your machine.
 
 First, clone the project, navigate to its root directory, and install the dependencies with
-```sh
+```bash
 poetry install
 ```
 
 Next, rename the file `sample_products.json` in the `data` directory to `products.json` and fill it as specified in the [Options](#options) section.
+
+### Email notifications
 
 If you want to get email notifications, the easiest way is to use a [Google account](https://www.google.com/account/about/) (for Gmail)
 with [2FA](https://support.google.com/accounts/answer/185839) enabled.
@@ -28,16 +29,31 @@ If you do not want to use Gmail you also have to specify:
 - `SMTP_SERVER` The SMTP server of your email provider.
 - `SMTP_PORT` The corresponding SMTP port.
 
-Be aware though, that non-Gmail approaches might run into issues with 2FA etc.
+Be aware though, that non-Gmail approaches might run into issues with 2FA etc. and were not tested.
 
 ## Usage
 
 Once everything is set up, you can run the script with
-```sh
+```bash
 poetry run python fundgrube_notifier.py
 ```
 
+### Cron job
+
 You can also set up a cron job (or something similar) to automatically execute the script every hour.
+For this, open the cron tab with
+```bash
+crontab -e
+```
+and then add the following line to configure the cron job (replace `<path>` with the path to this project's root directory):
+```crontab
+10 8-23 * * * cd <path>/fundgrube-notifier && poetry run python fundgrube_notifier.py
+```
+Make sure that cron has access to the correct `$PATH` (e.g., for poetry), by copying the following line *above* the definition of the cron job (replace `<user>` with your device's username):
+```bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/home/<user>/.local/bin
+```
+See [this](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-in-the-correct-paths) Stack Overflow post more details regarding cron and `$PATH`.
 
 ### Options
 
