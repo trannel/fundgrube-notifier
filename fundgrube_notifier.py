@@ -14,12 +14,6 @@ from requests.adapters import HTTPAdapter, Retry
 
 load_dotenv()
 dev = os.getenv("ENV") == 'dev'
-if dev:
-    log.basicConfig(level=log.DEBUG, format='%(asctime)s.%(msecs)04d %(levelname)s: %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S', encoding="utf-8")
-else:
-    log.basicConfig(level=log.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
-                    encoding="utf-8")
 
 retailers = [
     {
@@ -31,11 +25,32 @@ retailers = [
         "url": "https://schneinet.de/mediamarkt.html"
     }]
 
-s = requests.Session()
-retries = Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])
-adapter = HTTPAdapter(max_retries=retries)
-s.mount('http://', adapter)
-s.mount('https://', adapter)
+
+def configure_logging():
+    date_format = '%Y-%m-%d %H:%M:%S'
+    debug_format = log.Formatter('%(asctime)s.%(msecs)04d %(levelname)s: %(message)s', datefmt=date_format)
+    prod_format = log.Formatter('%(asctime)s %(message)s', datefmt=date_format)
+    file_handler = log.FileHandler("run.log", mode="w+")
+    file_handler.setLevel(log.DEBUG)
+    file_handler.setFormatter(debug_format)
+    stream_handler = log.StreamHandler()
+    if dev:
+        stream_handler.setLevel(log.DEBUG)
+        stream_handler.setFormatter(debug_format)
+    else:
+        stream_handler.setLevel(log.INFO)
+        stream_handler.setFormatter(prod_format)
+    log.basicConfig(level=log.DEBUG,
+                    handlers=[file_handler, stream_handler],
+                    encoding="utf-8")
+
+
+def configure_session():
+    session = requests.Session()
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
 
 
 def request(retailer: retailers) -> str:
@@ -162,6 +177,8 @@ def notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None) -> N
 
 
 if __name__ == '__main__':
+    configure_logging()
+    configure_session()
     log.debug("Start script")
     filename = "data/results.csv"
 
