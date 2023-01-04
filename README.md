@@ -6,7 +6,7 @@ This project notifies you about current offers from the German electronics retai
 
 Before you start make sure [python 3.9](https://www.python.org/downloads/) (or higher) and [poetry](https://python-poetry.org/docs/) are installed on your machine.
 
-First, clone the project, navigate to its root directory, and install the dependencies with
+First, clone the project, navigate to its root directory, and install the dependencies (this automatically creates a virtual environment):
 ```bash
 poetry install
 ```
