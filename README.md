@@ -53,7 +53,7 @@ Make sure that cron has access to the correct `$PATH` (e.g., for poetry), by cop
 ```bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/home/<user>/.local/bin
 ```
-See [this](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-in-the-correct-paths) Stack Overflow post more details regarding cron and `$PATH`.
+See [this](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-in-the-correct-paths) Stack Overflow post for more details regarding cron and `$PATH`.
 
 ### Options
 
