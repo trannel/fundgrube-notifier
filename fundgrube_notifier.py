@@ -26,7 +26,8 @@ retailers = [
     }]
 
 
-def configure_logging():
+def configure_logging() -> None:
+    """Configure logging, so the output of the current run is logged to the terminal and a file."""
     date_format = '%Y-%m-%d %H:%M:%S'
     debug_format = log.Formatter('%(asctime)s.%(msecs)04d %(levelname)s: %(message)s', datefmt=date_format)
     prod_format = log.Formatter('%(asctime)s %(message)s', datefmt=date_format)
@@ -45,7 +46,8 @@ def configure_logging():
                     encoding="utf-8")
 
 
-def configure_session():
+def configure_session() -> None:
+    """Configure the session, so network calls are retried."""
     session = requests.Session()
     retries = Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])
     adapter = HTTPAdapter(max_retries=retries)
@@ -54,6 +56,14 @@ def configure_session():
 
 
 def request(retailer: retailers) -> str:
+    """Request the current data for a given retailer.
+
+    Args:
+        retailer: The retailer to request data from.
+
+    Returns:
+        All current articles in html format.
+    """
     filename_html = f"data/{retailer['name']}.html"
 
     if dev and os.path.isfile(filename_html):
@@ -71,6 +81,14 @@ def request(retailer: retailers) -> str:
 
 
 def create_new_items() -> pd.DataFrame:
+    """Request current data and extract articles matching the filters defined in `products.json`.
+
+    Returns:
+        DataFrame with the extracted articles.
+
+    Raises:
+        ValueError: If the data source has not been updated for 2.5 hours.
+    """
     with open("data/products.json", "r", encoding="utf-8") as search_file:
         products = json.load(search_file)
     df = pd.DataFrame({})
@@ -115,18 +133,37 @@ def create_new_items() -> pd.DataFrame:
     return df
 
 
-def load_old_items(filename: str) -> pd.DataFrame:
+def load_old_items(results_filename: str) -> pd.DataFrame:
+    """Load articles retrieved in the previous run from a specified file.
+
+    Args:
+        results_filename: The name of the file with the articles.
+
+    Returns:
+        DataFrame with the articles form the previous run.
+    """
     log.debug("Load previous results")
-    if os.path.isfile(filename):
-        return pd.read_csv(filename, header=0, encoding="utf-8",
+    if os.path.isfile(results_filename):
+        return pd.read_csv(results_filename, header=0, encoding="utf-8",
                            dtype={"name": "object", "price": "object", "store": "object",
                                   "image": "object"}, parse_dates=["time"])
     else:
         return pd.DataFrame({"name": [], "price": [], "store": [], "image": [], "time": []})
 
 
-def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame) -> Tuple[int, pd.DataFrame]:
-    df = pd.merge(left=df_new, right=df_old, how="left", on=["name", "price", "store", "image"])
+def combine_dfs(df_current: pd.DataFrame, df_previous: pd.DataFrame, results_filename: str) -> Tuple[int, pd.DataFrame]:
+    """Combine articles from the previous and current run to determine the new articles.
+
+    Args:
+        df_current: DataFrame with the articles from the current run.
+        df_previous: DataFrame with the articles from the previous run.
+        results_filename: Name of the file to store the results for the next run.
+
+    Returns:
+        Number of new articles.
+        DataFrame with articles from the current run, ordered by timestamps.
+    """
+    df = pd.merge(left=df_current, right=df_previous, how="left", on=["name", "price", "store", "image"])
     df = df.drop_duplicates()
     new_count = df["time"].isna().sum()
 
@@ -137,11 +174,18 @@ def process_dfs(df_new: pd.DataFrame, df_old: pd.DataFrame) -> Tuple[int, pd.Dat
         log.info("\n" + df[:new_count].drop(columns="time").to_string(index=False, header=False))
 
     log.debug("Save results")
-    df.to_csv(filename, encoding="utf-8", index=False)
+    df.to_csv(results_filename, encoding="utf-8", index=False)
     return new_count, df
 
 
-def notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None) -> None:
+def mail_notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None) -> None:
+    """Notify the user about new articles via email, if set up.
+
+    Args:
+        new_count: Number of new articles.
+        df_merge: DataFrame with articles from the current run, ordered by timestamps.
+        error: The error to notify the user about, should one have occurred.
+    """
     mail_sender = os.getenv("MAIL_SENDER")
     mail_password = os.getenv("MAIL_PASSWORD")
     if (mail_sender and mail_password and new_count > 0) or error:
@@ -176,17 +220,22 @@ def notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None) -> N
         smtp_client.quit()
 
 
-if __name__ == '__main__':
+def main() -> None:
+    """Main function which executes all steps of the script."""
     configure_logging()
     configure_session()
     log.debug("Start script")
-    filename = "data/results.csv"
+    results_filename = "data/results.csv"
 
     try:
         df_new = create_new_items()
-        df_old = load_old_items(filename)
-        new_count, df_merge = process_dfs(df_new, df_old)
+        df_old = load_old_items(results_filename)
+        new_count, df_merge = combine_dfs(df_new, df_old, results_filename)
     except Exception as e:
-        notify(0, pd.DataFrame({}), e)
+        mail_notify(0, pd.DataFrame({}), e)
     else:
-        notify(new_count, df_merge)
+        mail_notify(new_count, df_merge)
+
+
+if __name__ == '__main__':
+    main()
