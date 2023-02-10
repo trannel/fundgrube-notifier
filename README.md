@@ -47,7 +47,7 @@ crontab -e
 ```
 and then add the following line to configure the cron job (replace `<path>` with the path to this project's root directory):
 ```crontab
-10 8-23 * * * cd <path>/fundgrube-notifier && poetry run python fundgrube_notifier.py
+5 8-23 * * * cd <path>/fundgrube-notifier && poetry run python fundgrube_notifier.py
 ```
 Make sure that cron has access to the correct `$PATH` (e.g., for poetry), by copying the following line *above* the definition of the cron job (replace `<user>` with your device's username):
 ```bash
@@ -59,14 +59,15 @@ See [this](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-i
 
 Entries in the `products.json` file are created in JSON format and every JSON object can have the following attributes to filter the available articles:
 - **include**: A list of terms that must appear in the name of the article (case-insensitive). Mandatory attribute.
-- **price**: Articles with a higher price are ignored. Optional attribute.
 - **exclude**: A list of terms, that must *not* appear in the name of the article (case-insensitive). Optional attribute.
+- **price**: Articles with a higher price are ignored. Optional attribute.
+- **store**: A list of terms, that must appear in the name of the store (case-insensitive). Optional attribute.
 
-When choosing the terms for `include` and `exclude`, remember that only simple string matching is done, so sometimes only using substrings might be beneficial.
+When choosing the terms for `include`, `exclude`, and `store`, remember that only simple string matching is done, so sometimes only using substrings might be beneficial.
 
 ### Example
 
-https://github.com/trannel/fundgrube-notifier/blob/14e2a8eee97d0efdf3dd9cb79cb869f48606f61a/sample_products.json#L1-L10
+https://github.com/trannel/fundgrube-notifier/blob/14e2a8eee97d0efdf3dd9cb79cb869f48606f61a/sample_products.json#L1-L11
 
 ## Fundgrube
 

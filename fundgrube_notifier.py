@@ -120,6 +120,7 @@ def create_new_items() -> pd.DataFrame:
             prices = [tag.parent.previous_sibling.contents[0].text for tag in tags]
             df_tmp = pd.DataFrame({"name": names, "price": prices, "store": stores, "image": images})
             if df_tmp.size > 0:
+                df_tmp["store"] = retailer.get("name") + " - " + df_tmp["store"]
                 if "price" in product:
                     df_tmp = df_tmp[
                         pd.to_numeric(df_tmp["price"].str.slice(stop=-1).str.replace(",", "")) <= product.get(
@@ -127,7 +128,9 @@ def create_new_items() -> pd.DataFrame:
                 if "exclude" in product:
                     terms_exclude = [x.lower() for x in product.get("exclude")]
                     df_tmp = df_tmp[~df_tmp["name"].str.contains("|".join(terms_exclude), case=False, regex=True)]
-                df_tmp["store"] = retailer.get("name") + " - " + df_tmp["store"]
+                if "store" in product:
+                    df_tmp = df_tmp[
+                        df_tmp["store"].str.contains("|".join(product.get("store")), case=False, regex=True)]
                 df = pd.concat([df, df_tmp])
             df = df.drop_duplicates()
     return df

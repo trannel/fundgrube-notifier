@@ -5,6 +5,7 @@
   },
   {
     "include": ["playstation"],
-    "price": 20
+    "price": 20,
+    "store": ["köln"]
   }
 ]
