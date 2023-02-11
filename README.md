@@ -58,16 +58,16 @@ See [this](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-i
 ### Options
 
 Entries in the `products.json` file are created in JSON format and every JSON object can have the following attributes to filter the available articles:
-- **include**: A list of terms that must appear in the name of the article (case-insensitive). Mandatory attribute.
-- **exclude**: A list of terms, that must *not* appear in the name of the article (case-insensitive). Optional attribute.
-- **price**: Articles with a higher price are ignored. Optional attribute.
-- **store**: A list of terms, that must appear in the name of the store (case-insensitive). Optional attribute.
+- **include**: A list of terms that must appear in the name of the article (case-insensitive). (Mandatory)
+- **exclude**: A list of terms, that must *not* appear in the name of the article (case-insensitive). (Optional)
+- **price**: Articles with a higher price are ignored. (Optional)
+- **store**: A list of terms, that must appear in the name of the store (case-insensitive). (Optional)
 
 When choosing the terms for `include`, `exclude`, and `store`, remember that only simple string matching is done, so sometimes only using substrings might be beneficial.
 
 ### Example
 
-https://github.com/trannel/fundgrube-notifier/blob/14e2a8eee97d0efdf3dd9cb79cb869f48606f61a/sample_products.json#L1-L11
+https://github.com/trannel/fundgrube-notifier/blob/8a3bad498f1b6be4824af17dd005c832ad29db6a/data/sample_products.json#L1-L11
 
 ## Fundgrube
 
