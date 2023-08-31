@@ -1,6 +1,6 @@
 # Fundgrube Notifier
 
-This project notifies you about current offers from the German electronics retail chains Saturn and Media Markt in their Fundgrube, that match specific conditions you can define.
+This project notifies you about current offers from the German electronics retail chains Saturn and MediaMarkt in their Fundgrube, that match specific conditions you can define.
 
 ## Setup
 
@@ -18,7 +18,7 @@ Next, rename the file `sample_products.json` in the `data` directory to `product
 If you want to get email notifications, the easiest way is to use a [Google account](https://www.google.com/account/about/) (for Gmail)
 with [2FA](https://support.google.com/accounts/answer/185839) enabled.
 In your account you have to generate an [app password](https://support.google.com/accounts/answer/185833) for Gmail.
-While creating the password select "Mail" as app and "Other" as device (select as custom name you see fit, e.g., " Raspberry Pi").
+While creating the password select "Mail" as app and "Other" as device (select as custom name you see fit, e.g., "Raspberry Pi").
 We need to use app passwords (which in turn require 2FA) due to a [policy change](https://support.google.com/accounts/answer/6010255) in mid-2022.
 Lastly, you have to rename the `sample.env` to `.env` and fill it as follows:
 - `MAIL_SENDER` The gmail address you want to send the emails from.
@@ -73,7 +73,7 @@ https://github.com/trannel/fundgrube-notifier/blob/8a3bad498f1b6be4824af17dd005c
 
 The Fundgrube has special offers that are usually very limited in numbers and can be found here:
 - Saturn: https://www.saturn.de/de/data/fundgrube
-- Media Markt: https://www.mediamarkt.de/de/data/fundgrube
+- MediaMarkt: https://www.mediamarkt.de/de/data/fundgrube
 
 ### Data
 
@@ -81,7 +81,7 @@ This project is using already preprocessed data, which is crawled hourly by a sc
 from [Barney](https://www.mydealz.de/profile/Barney) at [mydealz](https://www.mydealz.de/):
 
 - Saturn: https://schneinet.de/saturn.html
-- Media Markt: https://schneinet.de/mediamarkt.html
+- MediaMarkt: https://schneinet.de/mediamarkt.html
 
 More info:
 https://www.mydealz.de/diskussion/die-saturn-fundgrube-ist-da-einzelstucke-in-einzelnen-markten-gunstig-kaufen-1764598
