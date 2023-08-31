@@ -4,6 +4,7 @@ import os
 import smtplib
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import Tuple
 
 import pandas as pd
@@ -24,6 +25,10 @@ retailers = [
         "name": "MM",
         "url": "https://schneinet.de/mediamarkt.html"
     }]
+
+
+class NoDataException(Exception):
+    """Exception thrown, if there is no up-to-date data available"""
 
 
 def configure_logging() -> None:
@@ -109,7 +114,7 @@ def create_new_items() -> pd.DataFrame:
         if datetime.now() - last_update > timedelta(hours=2, minutes=30):
             message = f"No updated data available. Last update: {last_update}. Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
             log.error(message)
-            raise ValueError(message)
+            raise NoDataException()
 
         for product in products:
             terms_include = [x.lower() for x in product.get("include")]
@@ -191,7 +196,14 @@ def mail_notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None)
     """
     mail_sender = os.getenv("MAIL_SENDER")
     mail_password = os.getenv("MAIL_PASSWORD")
-    if (mail_sender and mail_password and new_count > 0) or error:
+    previous_error_file = Path("data/previous_error.txt")
+    if previous_error_file.exists():
+        with open(previous_error_file, "r") as file:
+            old_error = file.read()
+    else:
+        old_error = None
+    if mail_sender and mail_password and (new_count > 0 or error.__class__.__name__ != old_error):
+        # only send mail if: new data, or error, or error fixed
         smtp_server = os.getenv("SMTP_SERVER", 'smtp.gmail.com')
         smtp_port = os.getenv("SMTP_PORT", 587)
         sender = f'Fundgrube Notifier <{mail_sender}>'
@@ -199,16 +211,20 @@ def mail_notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None)
 
         if error:
             message_text = str(error)
-        else:
+            subject = f"An error occured"
+            with open(previous_error_file, "w") as file:
+                file.write(error.__class__.__name__)
+        elif new_count > 0:
             df_new_items = df_merge[:new_count].drop(columns="time")
-            message_text = "\n".join(["  ".join(list(row[1])) for row in df_new_items.iterrows()])
+            message_text = " \n".join(["  ".join(list(row[1])) for row in df_new_items.iterrows()])
+            subject = f"{new_count} new items"
+        else:
+            message_text = str("Previous error fixed")
+            subject = f"Error fixed"
+            os.remove(previous_error_file)
         log.debug(f"Mail message:\n{message_text}")
         message = MIMEText(message_text, "plain", "utf-8")
 
-        if error:
-            subject = f"An error occured"
-        else:
-            subject = f"{new_count} new items"
         if mail_sender == receiver:
             message['Subject'] = "Fundgrube: " + subject
         else:
