@@ -4,7 +4,7 @@
     "exclude": ["lcd"]
   },
   {
-    "include": ["playstation"],
+    "include": ["assassin", "creed", ["playstation 5", "ps5"]],
     "price": 20,
     "store": ["köln"]
   }

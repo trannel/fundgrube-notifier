@@ -117,8 +117,13 @@ def create_new_items() -> pd.DataFrame:
             raise NoDataException()
 
         for product in products:
-            terms_include = [x.lower() for x in product.get("include")]
-            tags = body.find_all('a', text=lambda text: text and all([term in text.lower() for term in terms_include]))
+            terms_include: list[str | list[str]] = [term_or_list.lower() if isinstance(term_or_list, str)
+                                                    else [term.lower() for term in term_or_list]
+                                                    for term_or_list in product.get("include")]
+            tags = body.find_all('a', string=lambda text: text and all(
+                term_or_list in text.lower() if isinstance(term_or_list, str)
+                else any(term in text.lower() for term in term_or_list)
+                for term_or_list in terms_include))
             stores = [tag.find_parent("div").previous_sibling.contents[0].text.strip() for tag in tags]
             images = [tag.get("href") for tag in tags]
             names = [tag.text for tag in tags]
@@ -139,6 +144,13 @@ def create_new_items() -> pd.DataFrame:
                 df = pd.concat([df, df_tmp])
             df = df.drop_duplicates()
     return df
+
+
+def check_tag(text: str, terms_include: list[str | list[str]]):
+    # find matching tags/products (all terms_include must be included. For lists only one term has to match)
+    return text and all(term_or_list in text.lower() if isinstance(term_or_list, str)
+                        else any(term in text.lower() for term in term_or_list)
+                        for term_or_list in terms_include)
 
 
 def load_old_items(results_filename: str) -> pd.DataFrame:

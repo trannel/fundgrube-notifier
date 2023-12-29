@@ -58,7 +58,8 @@ See [this](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-i
 ### Options
 
 Entries in the `products.json` file are created in JSON format and every JSON object can have the following attributes to filter the available articles:
-- **include**: A list of terms that must appear in the name of the article (case-insensitive). (Mandatory)
+- **include**: A list of terms that must appear in the name of the article (case-insensitive; `AND` operator). (Mandatory).
+    - Also accepts lists of terms instead of terms, of which only one term has to match (`OR` operator; see example).
 - **exclude**: A list of terms, that must *not* appear in the name of the article (case-insensitive). (Optional)
 - **price**: Articles with a higher price are ignored. (Optional)
 - **store**: A list of terms, that must appear in the name of the store (case-insensitive). (Optional)
