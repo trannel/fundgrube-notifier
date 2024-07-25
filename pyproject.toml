@@ -2,7 +2,7 @@
 name = "fundgrube-notifier"
 version = "0.1.0"
 description = ""
-authors = ["Lennart Küll"]
+authors = ["Lennart Küll <lennart.kuell@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -10,6 +10,7 @@ beautifulsoup4 = "^4.11.1"
 pandas = "^1.5.2"
 python-dotenv = "^0.21.0"
 requests = "^2.28.1"
+numpy = "<2"
 
 [tool.poetry.dev-dependencies]
 
