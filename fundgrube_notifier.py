@@ -1,4 +1,5 @@
 import json
+import logging
 import logging as log
 import os
 import smtplib
@@ -11,7 +12,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from requests.adapters import HTTPAdapter, Retry
+from requests import RequestException
 
 load_dotenv()
 dev = os.getenv("ENV") == 'dev'
@@ -51,15 +52,6 @@ def configure_logging() -> None:
                     encoding="utf-8")
 
 
-def configure_session() -> None:
-    """Configure the session, so network calls are retried."""
-    session = requests.Session()
-    retries = Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])
-    adapter = HTTPAdapter(max_retries=retries)
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
-
-
 def request(retailer: retailers) -> str:
     """Request the current data for a given retailer.
 
@@ -69,20 +61,27 @@ def request(retailer: retailers) -> str:
     Returns:
         All current articles in html format.
     """
-    filename_html = f"data/{retailer['name']}.html"
+    filename_html = Path(f"data/{retailer['name']}.html")
+    tries = 3
 
-    if dev and os.path.isfile(filename_html):
-        last_update = os.path.getmtime(filename_html)
+    if dev and filename_html.is_file():
+        last_update = filename_html.stat().st_mtime
         time_diff = datetime.now().timestamp() - last_update
         if time_diff < 50 * 60:
-            with open(filename_html, "r", encoding="utf-8") as file:
-                log.debug("Loaded items from file")
-                return file.read()
-    html = requests.get(retailer["url"]).content
-    if dev:
-        with open(filename_html, "wb") as file:
-            file.write(html)
-    return html.decode("utf-8")
+            content = filename_html.read_text(encoding="utf-8")
+            log.debug("Loaded items from file")
+            return content
+    for i in range(tries):
+        try:
+            html = requests.get(retailer["url"]).content
+            if dev:
+                filename_html.write_bytes(html)
+            return html.decode("utf-8")
+        except RequestException as e:
+            if i + 1 == tries:
+                raise e
+            else:
+                logging.warning(f"An error occurred while requesting: {e}")
 
 
 def create_new_items() -> pd.DataFrame:
@@ -94,8 +93,8 @@ def create_new_items() -> pd.DataFrame:
     Raises:
         ValueError: If the data source has not been updated for 2.5 hours.
     """
-    with open("data/products.json", "r", encoding="utf-8") as search_file:
-        products = json.load(search_file)
+    search_file = Path("data/products.json")
+    products = json.loads(search_file.read_text(encoding="utf-8"))
     df = pd.DataFrame({})
 
     for retailer in retailers:
@@ -112,7 +111,8 @@ def create_new_items() -> pd.DataFrame:
         log.debug(f"Last update: {last_update}")
 
         if datetime.now() - last_update > timedelta(hours=2, minutes=30):
-            message = f"No updated data available. Last update: {last_update}. Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+            message = (f"No updated data available. Last update: {last_update}. "
+                       f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.")
             log.error(message)
             raise NoDataException()
 
@@ -153,7 +153,7 @@ def check_tag(text: str, terms_include: list[str | list[str]]):
                         for term_or_list in terms_include)
 
 
-def load_old_items(results_filename: str) -> pd.DataFrame:
+def load_old_items(results_filename: Path) -> pd.DataFrame:
     """Load articles retrieved in the previous run from a specified file.
 
     Args:
@@ -163,7 +163,7 @@ def load_old_items(results_filename: str) -> pd.DataFrame:
         DataFrame with the articles form the previous run.
     """
     log.debug("Load previous results")
-    if os.path.isfile(results_filename):
+    if results_filename.is_file():
         return pd.read_csv(results_filename, header=0, encoding="utf-8",
                            dtype={"name": "object", "price": "object", "store": "object",
                                   "image": "object"}, parse_dates=["time"])
@@ -171,7 +171,8 @@ def load_old_items(results_filename: str) -> pd.DataFrame:
         return pd.DataFrame({"name": [], "price": [], "store": [], "image": [], "time": []})
 
 
-def combine_dfs(df_current: pd.DataFrame, df_previous: pd.DataFrame, results_filename: str) -> Tuple[int, pd.DataFrame]:
+def combine_dfs(df_current: pd.DataFrame, df_previous: pd.DataFrame, results_filename: Path) -> Tuple[
+    int, pd.DataFrame]:
     """Combine articles from the previous and current run to determine the new articles.
 
     Args:
@@ -222,7 +223,7 @@ def mail_notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None)
         receiver = os.getenv("MAIL_RECEIVER", mail_sender)
 
         if error:
-            message_text = str(error)
+            message_text = repr(error)
             subject = f"An error occured"
             with open(previous_error_file, "w") as file:
                 file.write(error.__class__.__name__)
@@ -254,9 +255,8 @@ def mail_notify(new_count: int, df_merge: pd.DataFrame, error: Exception = None)
 def main() -> None:
     """Main function which executes all steps of the script."""
     configure_logging()
-    configure_session()
     log.debug("Start script")
-    results_filename = "data/results.csv"
+    results_filename = Path("data/results.csv")
 
     try:
         df_new = create_new_items()
